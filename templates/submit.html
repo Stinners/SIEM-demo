@@ -1,0 +1,22 @@
+
+{% extends "layout.html" %}
+{% block contents %}
+<div class="m-4">
+    {% for button in buttons %}
+        {% if button == active_button %}
+            <a class="button is-link">{{button}}</a>
+        {% else %}
+            <a class="button" href="/examples/{{button}}">{{button}}</a>
+        {% endif %}
+    {% endfor %}
+</div>
+<form action="/send_event", method="post">
+    <input type="hidden" name="active_log" value="{{active_button}}">
+    <div class="columns my-4 ml-4">
+        <label class="label"id="repeat-label">Repeat</label>
+        <input type="number" class="input column is-one-quarter" min="1" max="100" value="1">
+    </div>
+    <textarea id="submit_logs" class="textarea is_primary" name="log_text">{{contents}}</textarea>
+    <input type="submit" class="button is-primary m-4" value="Submit Logs">
+</form>
+{% endblock %}
