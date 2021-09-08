@@ -6,19 +6,14 @@
     <p>Waiting</p>
     <details class="message">
         <summary class="message-header">
-            <span>Logs Submitted<span>
+            <span>Show Submitted Logs<span>
         </summary>
-        <p class="message-body">{{log_text}}</p>
+        <pre class="message-body">{{log_text}}</pre>
     </details>
     <div id="message-container">
     </div>
     <script type="module">
-        console.log("Loading")
         import { connectStreamSource } from "https://cdn.skypack.dev/pin/@hotwired/turbo@v7.0.0-rc.3-Ke3RjT96B5Lqzi8XKAG9/mode=imports/optimized/@hotwired/turbo.js"
-        //console.log("Connecting")
-        //let ws = new WebSocket("wss://" + document.location.host + "/ws")
-        //console.log("Streaming"
-        //connectStreamSource("https://" + document.location.host + "/listen");
         Turbo.connectStreamSource(new EventSource("/listen"))
     </script>
 </div>

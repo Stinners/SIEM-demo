@@ -1,13 +1,16 @@
 import logging as log
 import os
 from os.path import splitext, join
+import json
+from typing import Optional, Any
 
 from fastapi import FastAPI, Request, Form
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import dotenv
 from sse_starlette.sse import EventSourceResponse
+
 
 from azure_connect import send_logs, start_eh_listener
 
@@ -18,7 +21,18 @@ dotenv.load_dotenv()
 
 LOGS_DIR = "dummy_logs"
 
-log.basicConfig(level=log.DEBUG)
+log.basicConfig(level=log.WARNING)
+
+# Either returns the json object or None
+def is_valid_json(text: str) -> Optional[Any]:
+    try:
+        return json.loads(text)
+    except json.decoder.JSONDecodeError:
+        return None
+
+def repeat_logs(parsed, n):
+    if type(parsed) == list:
+        parsed *= n
 
 def get_file(path):
     path = join(LOGS_DIR, path)
@@ -66,9 +80,13 @@ def examples(request: Request, active_log: str):
 def root(request: Request):
     return examples(request, "Custom")
 
-@app.post("/send_event", response_class="HTMLResponse")
-def submit(request: Request, log_text: str = Form(...), active_log: str = Form(...)):
-    time = send_logs(log_text, active_log)
+@app.post("/event")
+def display_event(request: Request, active_log: str = Form(...), log_text: str = Form(...), repeat: int = Form(...)):
+    if json_object := is_valid_json(log_text):
+        repeat_logs(json_object, repeat)
+        log_text = json.dumps(json_object, indent=4, sort_keys=True)
+    time = ""
+    #time = send_logs(log_text, active_log)
     context = {
         "request": request,
         "active_log": active_log,
@@ -76,6 +94,10 @@ def submit(request: Request, log_text: str = Form(...), active_log: str = Form(.
         "time": time
     }
     return templates.TemplateResponse("results.html", context)
+
+@app.post("/send_event")
+def submit(request: Request, log_text: str = Form(...), active_log: str = Form(...)):
+    return RedirectResponse("/event")
 
 @app.get("/listen")
 async def sse_endpoint(request: Request):

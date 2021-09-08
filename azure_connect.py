@@ -5,37 +5,30 @@ import logging as log
 import asyncio
 
 from azure.storage.blob import BlobClient
-from azure.eventhub.aio import EventHubConsumerClient, EventHubSharedKeyCredential
+from azure.eventhub.aio import EventHubConsumerClient
 from azure.eventhub.extensions.checkpointstoreblobaio import BlobCheckpointStore
-from azure.eventhub import TransportType
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-DATE_BLOB_PATH = "%Y/%m/%d/%H/"
+DATE_BLOB_PATH = "%Y/%m/%d/%H"
 DATE_DISPLAY_STRING = "%H:%M %S"
 
-log_type_to_container = {
-    "AAD": "insights-logs-auditlogs",
-    "Linux": "insights-logs-auditlogs",
-    "Custom": "insights-logs-auditlogs",
-}
+CONTAINER_NAME = "insights-logs-auditlogs"
 
 def current_time(formater):
     return datetime.now().strftime(formater)
 
-def make_name(basename: str):
-    now = datetime.now().strftime(DATE_BLOB_PATH)
+def make_name(basename: str, log_type: str):
     now = datetime.now().strftime(DATE_BLOB_PATH)
     id = str(uuid.uuid4())
-    name = now + basename + "-" + id + ".json"
+    name = f"{log_type}/{now}/{basename}-{id}.json"
     return name
 
 def send_logs(logs: str, log_type: str):
-    name = make_name("test")
-    container = log_type_to_container[log_type]
+    name = make_name("test", log_type)
     try:
         client = BlobClient.from_connection_string(
             conn_str = os.getenv("STORAGE_CONNECTION_STRING"),
-            container_name = container,
+            container_name = CONTAINER_NAME,
             blob_name = name
         )
     except:
@@ -48,31 +41,35 @@ def send_logs(logs: str, log_type: str):
     return datetime.now().strftime(DATE_DISPLAY_STRING)
 
 async def eh_listener(queue):
+    """ This sets up a listener that captures events from the event hub and puts them into 
+    an asyncio queue. It is intended to be used with 'eh_responder'"""
     event_connection = os.getenv("EVENT_CONNECTION_STRING")
     storage_connection = os.getenv("STORAGE_CONNECTION_STRING")
 
     checkpoint = BlobCheckpointStore.from_connection_string(
         storage_connection,
-         "insights-logs-auditlogs", # TODO work out if this is an appropriate store
+         "insights-logs-auditlogs", 
     )
 
     client = EventHubConsumerClient.from_connection_string(
         event_connection,
         consumer_group="$Default",
         eventhub_name="siem-test",
-        #checkpoint_store=checkpoint
+        checkpoint_store=checkpoint
     )
 
     async def handle_event(partition_context, event):
         event_text = event.body_as_str(encoding="UTF-8")
         time = current_time(DATE_DISPLAY_STRING)
         await queue.put((event_text, time))
-        #await partition_context.update_checkpoint(event)
+        await partition_context.update_checkpoint(event)
 
     async with client:
         await client.receive(on_event=handle_event, starting_position="-1")
 
 async def eh_responder(request, queue, listener):
+    """This captures events from the queue and renders them into a template, for use in Turbo Streams
+    This function is structured to be used with starlette's EventSourceResponse class"""
     template_env = Environment(
         loader=FileSystemLoader("templates"),
         autoescape=select_autoescape()
