@@ -1,18 +1,15 @@
-# Currently I can't connect to the event hub, research indicates this is a problem with
-# not having access to particular ports
-
-
-from fastapi import FastAPI, Request, Form, WebSocket
-from fastapi.responses import HTMLResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
-import dotenv
-
 import logging as log
 import os
 from os.path import splitext, join
 
-from azure_connect import event_hub_listen, send_logs
+from fastapi import FastAPI, Request, Form
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+import dotenv
+from sse_starlette.sse import EventSourceResponse
+
+from azure_connect import send_logs, start_eh_listener
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -72,26 +69,14 @@ def root(request: Request):
 @app.post("/send_event", response_class="HTMLResponse")
 def submit(request: Request, log_text: str = Form(...), active_log: str = Form(...)):
     time = send_logs(log_text, active_log)
-    print("GETTING TIME")
     context = {
         "request": request,
         "active_log": active_log,
         "log_text": log_text,
         "time": time
     }
-    print("SERVING RESPONSE")
     return templates.TemplateResponse("results.html", context)
-
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()
-    await event_hub_listen(websocket)
 
 @app.get("/listen")
 async def sse_endpoint(request: Request):
-    import azure_connect
-    import asyncio
-    loop = asyncio.get_event_loop()
-    queue = asyncio.Queue()
-    listener = loop.create_task(azure_connect.sse_listener(queue))
-    return EventSourceResponse(azure_connect.sse_responder(request, queue, listener))
+    return EventSourceResponse(start_eh_listener(request))

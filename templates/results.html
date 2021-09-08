@@ -2,14 +2,6 @@
 {% extends "layout.html" %}
 {% block contents %}
 <div>
-    <script type="module">
-        console.log("Loading")
-        import { connectStreamSource } from "https://cdn.skypack.dev/pin/@hotwired/turbo@v7.0.0-rc.3-Ke3RjT96B5Lqzi8XKAG9/mode=imports/optimized/@hotwired/turbo.js"
-        console.log("Connecting")
-        let ws = new WebSocket("wss://" + document.location.host + "/ws")
-        console.log("Streaming")
-        connectStreamSource(ws);
-    </script>
     <h2>Submitted {{active_log}} logs at time {{time}}</h2>
     <p>Waiting</p>
     <details class="message">
@@ -20,5 +12,14 @@
     </details>
     <div id="message-container">
     </div>
+    <script type="module">
+        console.log("Loading")
+        import { connectStreamSource } from "https://cdn.skypack.dev/pin/@hotwired/turbo@v7.0.0-rc.3-Ke3RjT96B5Lqzi8XKAG9/mode=imports/optimized/@hotwired/turbo.js"
+        //console.log("Connecting")
+        //let ws = new WebSocket("wss://" + document.location.host + "/ws")
+        //console.log("Streaming"
+        //connectStreamSource("https://" + document.location.host + "/listen");
+        Turbo.connectStreamSource(new EventSource("/listen"))
+    </script>
 </div>
 {% endblock %}
