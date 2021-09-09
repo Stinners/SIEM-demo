@@ -4,15 +4,15 @@ from os.path import splitext, join
 import json
 from typing import Optional, Any
 
-from fastapi import FastAPI, Request, Form
+from fastapi import FastAPI, Request, Form 
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm, oauth2
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import dotenv
 from sse_starlette.sse import EventSourceResponse
 
-
-from azure_connect import send_logs, start_eh_listener
+from azure_connect import AzureConnector, TestAzureConnector
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -22,6 +22,11 @@ dotenv.load_dotenv()
 LOGS_DIR = "dummy_logs"
 
 log.basicConfig(level=log.WARNING)
+
+if os.getenv("ENV") == 'prod':
+    azure = AzureConnector()
+else:
+    azure = TestAzureConnector()
 
 # Either returns the json object or None
 def is_valid_json(text: str) -> Optional[Any]:
@@ -81,12 +86,18 @@ def root(request: Request):
     return examples(request, "Custom")
 
 @app.post("/event")
-def display_event(request: Request, active_log: str = Form(...), log_text: str = Form(...), repeat: int = Form(...)):
+def display_event(request: Request, 
+                  active_log: str = Form(...),
+                  log_text: str = Form(...),
+                  repeat: int = Form(...)):
+                  
+
     if json_object := is_valid_json(log_text):
         repeat_logs(json_object, repeat)
         log_text = json.dumps(json_object, indent=4, sort_keys=True)
-    time = ""
-    #time = send_logs(log_text, active_log)
+
+    time = azure.send_logs(log_text, active_log)
+
     context = {
         "request": request,
         "active_log": active_log,
@@ -96,9 +107,11 @@ def display_event(request: Request, active_log: str = Form(...), log_text: str =
     return templates.TemplateResponse("results.html", context)
 
 @app.post("/send_event")
-def submit(request: Request, log_text: str = Form(...), active_log: str = Form(...)):
+def submit(request: Request, 
+           log_text: str = Form(...),
+           active_log: str = Form(...)):
     return RedirectResponse("/event")
 
 @app.get("/listen")
 async def sse_endpoint(request: Request):
-    return EventSourceResponse(start_eh_listener(request))
+    return EventSourceResponse(azure.start_eh_listener(request))

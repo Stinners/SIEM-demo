@@ -5,3 +5,7 @@
 #repeat-label {
     margin: auto 1em auto 0;
 }
+
+.eh-message {
+    cursor: pointer;
+}

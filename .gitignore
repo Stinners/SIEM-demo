@@ -2,3 +2,4 @@ dummy_logs/*.json
 venv/
 __pycache__
 .env
+.azure
