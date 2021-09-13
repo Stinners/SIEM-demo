@@ -14,7 +14,7 @@
     </div>
     <script type="module">
         import { connectStreamSource } from "https://cdn.skypack.dev/pin/@hotwired/turbo@v7.0.0-rc.3-Ke3RjT96B5Lqzi8XKAG9/mode=imports/optimized/@hotwired/turbo.js"
-        let stream = Turbo.connectStreamSource(new EventSource("/listen"))
+        let stream = Turbo.connectStreamSource(new EventSource("sse/listen"))
     </script>
 </div>
 {% endblock %}

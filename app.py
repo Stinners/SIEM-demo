@@ -2,7 +2,9 @@ import logging as log
 import os
 from os.path import splitext, join
 import json
+import pathlib
 from typing import Optional, Any
+import asyncio
 
 from fastapi import FastAPI, Request, Form 
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm, oauth2
@@ -11,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import dotenv
 from sse_starlette.sse import EventSourceResponse
+from starlette.status import HTTP_303_SEE_OTHER
 
 from azure_connect import AzureConnector, TestAzureConnector
 
@@ -70,6 +73,24 @@ def get_dummy_logs(target="Custom"):
 
     return (files, text)
 
+@app.get("/put/logs")
+def new_logs_form(request: Request):
+    return templates.TemplateResponse("new_logs.html", {"request": request})
+
+def check_path(path):
+    name = os.path.join(LOGS_DIR, f"{path}.json")
+
+    new_filepath = pathlib.Path(name)
+    logs_dir = pathlib.Path(LOGS_DIR)
+
+    if logs_dir == new_filepath.parent:
+        print("Working")
+        return name 
+    else:
+        print("Not working")
+        raise Exception()
+
+
 @app.get("/examples/{active_log}", response_class=HTMLResponse)
 def examples(request: Request, active_log: str):
     log_types, log_text = get_dummy_logs(target=active_log)
@@ -80,6 +101,19 @@ def examples(request: Request, active_log: str):
         "active_button": active_log,
     }
     return templates.TemplateResponse("submit.html", context)
+
+@app.post("/put/logs")
+def new_log_file(request: Request, filename: str = Form(...), log_text: str = Form(...)):
+    name = filename.strip()
+    name = os.path.splitext(name)[0]
+    try:
+        cleaned = check_path(name)
+        with open(cleaned, 'w') as f:
+            f.write(log_text)
+    except:
+        name = "Custom"
+    url_filename = os.path.splitext(filename)[0]
+    return RedirectResponse(f"/examples/{name}", status_code=HTTP_303_SEE_OTHER)
 
 @app.get("/", response_class=HTMLResponse)
 def root(request: Request):
@@ -112,6 +146,35 @@ def submit(request: Request,
            active_log: str = Form(...)):
     return RedirectResponse("/event")
 
-@app.get("/listen")
+@app.get("/sse/listen")
 async def sse_endpoint(request: Request):
     return EventSourceResponse(azure.start_eh_listener(request))
+
+@app.post("poll/listen")
+async def listen():
+    # Check if the queue exists and create it if not 
+    try: 
+        app.queue 
+    except NameError:
+        app.queue = asyncio.Queue()
+        azure.eh_listener(app.queue)
+    return {"listen": "started"}
+
+def read_all(queue):
+    results = []
+    while True:
+        try:
+            results.append(queue.get_nowait())
+        except asyncio.QueueEmpty:
+            break 
+    return results
+
+@app.get("poll/poll")
+async def poll():
+    try:
+        app.queue
+    except NameError:
+        return {"poll": "not started"}
+    
+    events = read_all(json.dumps(app.queue))
+    return {"poll": "polling", "events": events}
