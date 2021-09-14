@@ -1,0 +1,40 @@
+{% extends "layout.html" %}
+
+{% block contents %}
+<div>
+    <h1 class="title">Submitted {{active_log}} logs</h2>
+    <details class="message eh-message">
+        <summary class="message-header">
+            <span>Submitted Logs</span>
+            <span>{{time}}</span>
+        </summary>
+        <pre class="message-body">{{log_text}}</pre>
+    </details>
+    <div id="message-container">
+    </div>
+    <script>
+        document.addEventListener("turbo:load", () => {
+            const eventContainer = document.getElementById("message-container");
+
+            // Start the listener
+            fetch("poll/listen", {method: "POST"});
+
+            const makeEvents = (events) => {
+                events.forEach(event => {
+                    let newNode = document.createElement("div");
+                    newNode.innerHTML = event;
+                    eventContainer.appendChild(newNode);
+                });
+            }
+
+            let poller = setInterval(() => {
+                fetch("poll/poll")
+                    .then(response => response.json())
+                    .then(data => data.events)
+                    .then(makeEvents);
+            }, 5000);
+        });
+        document("turbo")
+    </script>
+</div>
+{% endblock %}

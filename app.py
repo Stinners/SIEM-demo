@@ -150,14 +150,14 @@ def submit(request: Request,
 async def sse_endpoint(request: Request):
     return EventSourceResponse(azure.start_eh_listener(request))
 
-@app.post("poll/listen")
+@app.post("/poll/listen")
 async def listen():
     # Check if the queue exists and create it if not 
     try: 
         app.queue 
-    except NameError:
+    except AttributeError:
         app.queue = asyncio.Queue()
-        azure.eh_listener(app.queue)
+        await azure.eh_listener(app.queue)
     return {"listen": "started"}
 
 def read_all(queue):
@@ -169,12 +169,13 @@ def read_all(queue):
             break 
     return results
 
-@app.get("poll/poll")
+@app.get("/poll/poll")
 async def poll():
     try:
         app.queue
     except NameError:
         return {"poll": "not started"}
     
-    events = read_all(json.dumps(app.queue))
+    events = read_all(app.queue)
+    events = [azure.render_message(text, time) for (text, time) in events]
     return {"poll": "polling", "events": events}

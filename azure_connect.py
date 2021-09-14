@@ -30,6 +30,13 @@ def test_send_logs(logs, log_type):
 
 
 class AbstractAzureConnector(ABC):
+    def __init__(self):
+        template_env = Environment(
+            loader=FileSystemLoader("templates"),
+            autoescape=select_autoescape()
+        )
+        self.template = template_env.get_template("message.html")
+
     @abstractmethod
     def send_logs(self, logs: str, log_type):
         pass
@@ -37,6 +44,9 @@ class AbstractAzureConnector(ABC):
     @abstractmethod
     async def eh_listener(self, queue): 
         pass
+
+    def render_message(self, text, time):
+        return self.template.render(message_content=text, time=time)
 
     async def eh_responder(self, request, queue, listener):
         """This captures events from the queue and renders them into a template, for use in Turbo Streams
