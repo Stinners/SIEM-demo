@@ -1,7 +1,6 @@
 import os
 import uuid
 from datetime import datetime
-import logging as log
 import asyncio
 from abc import ABC, abstractmethod
 
@@ -10,11 +9,14 @@ from azure.eventhub.aio import EventHubConsumerClient
 from azure.eventhub.extensions.checkpointstoreblobaio import BlobCheckpointStore
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
+import logger
+
 DATE_BLOB_PATH = "%Y/%m/%d/%H"
-#DATE_DISPLAY_STRING = "%H:%M:%S "
 DATE_DISPLAY_STRING = "%X "
 
 CONTAINER_NAME = "insights-logs-auditlogs"
+
+log = logger.get_logger()
 
 def current_time(formater):
     return datetime.now().strftime(formater)
@@ -55,6 +57,7 @@ class TestAzureConnector(AbstractAzureConnector):
 
     async def eh_listener(self, queue):
         for i in range(5):
+            log.debug("Putting event")
             time = current_time(DATE_DISPLAY_STRING)
             await queue.put((f"Test Event {i}", time))
             await asyncio.sleep(2)
@@ -88,9 +91,6 @@ class AzureConnector(AbstractAzureConnector):
             "insights-logs-auditlogs", 
         )
 
-        print("CONNECTION STRING")
-        print(self.event_connector)
-
         client = EventHubConsumerClient.from_connection_string(
             self.event_connector,
             consumer_group="$Default",
@@ -98,7 +98,11 @@ class AzureConnector(AbstractAzureConnector):
             checkpoint_store=checkpoint
         )
 
+
+        log.debug("EH Connection started")
+
         async def handle_event(partition_context, event):
+            log.debug("Putting event")
             event_text = event.body_as_str(encoding="UTF-8")
             time = current_time(DATE_DISPLAY_STRING)
             await queue.put((event_text, time))

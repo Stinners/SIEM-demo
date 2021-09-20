@@ -1,4 +1,3 @@
-import logging as log
 import os
 from os.path import splitext, join
 import json
@@ -6,15 +5,16 @@ import pathlib
 from typing import Optional, Any
 import asyncio
 
-from fastapi import FastAPI, Request, Form 
+from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.logger import logger
 from fastapi.templating import Jinja2Templates
 import dotenv
 from starlette.status import HTTP_303_SEE_OTHER
 
 from azure_connect import AzureConnector, TestAzureConnector
+import logger
+
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -23,18 +23,14 @@ dotenv.load_dotenv()
 
 LOGS_DIR = "dummy_logs"
 
-if os.getenv("ENV") == 'prod':
-    gunicorn_logger = log.getLogger('gunicorn.error')
-    logger.handlers = gunicorn_logger.handlers
-    logger.setLevel(gunicorn_logger.level)
-    log = logger
-else:
-    log.basicConfig(level=log.WARNING)
+log = logger.get_logger()
 
 if os.getenv("ENV") == 'prod':
     azure = AzureConnector()
 else:
     azure = TestAzureConnector()
+
+log.debug("============ DEBUG LOGGING ===============")
 
 # Either returns the json object or None
 def is_valid_json(text: str) -> Optional[Any]:
@@ -89,10 +85,8 @@ def check_path(path):
     logs_dir = pathlib.Path(LOGS_DIR)
 
     if logs_dir == new_filepath.parent:
-        print("Working")
-        return name 
+        return name
     else:
-        print("Not working")
         raise Exception()
 
 
@@ -129,7 +123,6 @@ def display_event(request: Request,
                   active_log: str = Form(...),
                   log_text: str = Form(...),
                   repeat: int = Form(...)):
-                  
 
     json_object = is_valid_json(log_text)
     if json_object:
@@ -154,19 +147,21 @@ def submit(request: Request,
 
 @app.post("/poll/subscribe")
 async def listen():
-    try: 
-        app.queue 
+    try:
+        log.debug("Subscribing with prexisting queue")
+        app.queue
     except AttributeError:
+        log.debug("Creating queue")
         app.queue = asyncio.Queue()
         asyncio.create_task(azure.eh_listener(app.queue))
     return {"listen": "started"}
 
 async def get_events(queue, num_retries):
     events = []
-    retries = 0 
+    retries = 0
+    log.debug("Getting events")
     while retries < num_retries:
         try:
-            print("Subscribing")
             next_event = queue.get_nowait()
             events.append(next_event)
         except asyncio.QueueEmpty:
@@ -174,7 +169,7 @@ async def get_events(queue, num_retries):
                 break
             else:
                 await asyncio.sleep(2)
-                retries += 1 
+                retries += 1
     return events
 
 
@@ -186,8 +181,8 @@ async def poll():
         return {"poll": "not started"}
 
     events = await get_events(app.queue, num_retries=5)
-    print("EVENTS")
-    print(events)
+    log.debug("EVENTS")
+    log.debug(events)
 
     events = [azure.render_message(text, time) for (text, time) in events]
     return {"poll": "polling", "events": events}
