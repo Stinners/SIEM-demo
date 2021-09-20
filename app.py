@@ -9,6 +9,7 @@ import asyncio
 from fastapi import FastAPI, Request, Form 
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.logger import logger
 from fastapi.templating import Jinja2Templates
 import dotenv
 from starlette.status import HTTP_303_SEE_OTHER
@@ -22,7 +23,13 @@ dotenv.load_dotenv()
 
 LOGS_DIR = "dummy_logs"
 
-log.basicConfig(level=log.WARNING)
+if os.getenv("ENV") == 'prod':
+    gunicorn_logger = log.getLogger('gunicorn.error')
+    logger.handlers = gunicorn_logger.handlers
+    logger.setLevel(gunicorn_logger.level)
+    log = logger
+else:
+    log.basicConfig(level=log.WARNING)
 
 if os.getenv("ENV") == 'prod':
     azure = AzureConnector()
@@ -159,6 +166,7 @@ async def get_events(queue, num_retries):
     retries = 0 
     while retries < num_retries:
         try:
+            print("Subscribing")
             next_event = queue.get_nowait()
             events.append(next_event)
         except asyncio.QueueEmpty:
@@ -178,6 +186,8 @@ async def poll():
         return {"poll": "not started"}
 
     events = await get_events(app.queue, num_retries=5)
+    print("EVENTS")
+    print(events)
 
     events = [azure.render_message(text, time) for (text, time) in events]
     return {"poll": "polling", "events": events}

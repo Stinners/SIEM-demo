@@ -48,25 +48,6 @@ class AbstractAzureConnector(ABC):
     def render_message(self, text, time):
         return self.template.render(message_content=text, time=time)
 
-    async def eh_responder(self, request, queue, listener):
-        """This captures events from the queue and renders them into a template, for use in Turbo Streams
-        This function is structured to be used with starlette's EventSourceResponse class"""
-        template_env = Environment(
-            loader=FileSystemLoader("templates"),
-            autoescape=select_autoescape()
-        )
-
-        template = template_env.get_template("message.html")
-
-        while True:
-            if await request.is_disconnected():
-                listener.cancel()
-                break
-
-            text, time = await queue.get()
-            response = template.render(message_content=text, time=time)
-            yield response
-
 class TestAzureConnector(AbstractAzureConnector):
     """ Class for testing the frontend without touching azure"""
     def send_logs(self, logs, log_type):
@@ -107,10 +88,13 @@ class AzureConnector(AbstractAzureConnector):
             "insights-logs-auditlogs", 
         )
 
+        print("CONNECTION STRING")
+        print(self.event_connector)
+
         client = EventHubConsumerClient.from_connection_string(
             self.event_connector,
             consumer_group="$Default",
-            eventhub_name="siem-test",
+            eventhub_name="eh-siemlogs-sb-001",
             checkpoint_store=checkpoint
         )
 
