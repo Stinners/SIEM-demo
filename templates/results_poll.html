@@ -1,5 +1,19 @@
 {% extends "layout.html" %}
 
+{% block page_script %}
+<script>
+    console.log("Script running");
+    document.addEventListener("turbo:load" , () => {
+        // This might setup a race condition, if the first poll response 
+        // arrives before the listen
+        console.log("Listener Starting");
+        fetch("/poll/listen", {method: "POST"});
+        eventContainer = document.getElementById("message-container");
+        poller(2, eventContainer);
+    });
+</script>
+{% endblock %}
+
 {% block contents %}
 <div>
     <h1 class="title">Submitted {{active_log}} logs</h2>
@@ -12,29 +26,5 @@
     </details>
     <div id="message-container">
     </div>
-    <script>
-        document.addEventListener("turbo:load", () => {
-            const eventContainer = document.getElementById("message-container");
-
-            // Start the listener
-            fetch("poll/listen", {method: "POST"});
-
-            const makeEvents = (events) => {
-                events.forEach(event => {
-                    let newNode = document.createElement("div");
-                    newNode.innerHTML = event;
-                    eventContainer.appendChild(newNode);
-                });
-            }
-
-            let poller = setInterval(() => {
-                fetch("poll/poll")
-                    .then(response => response.json())
-                    .then(data => data.events)
-                    .then(makeEvents);
-            }, 5000);
-        });
-        document("turbo")
-    </script>
 </div>
 {% endblock %}

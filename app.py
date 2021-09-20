@@ -12,7 +12,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import dotenv
-from sse_starlette.sse import EventSourceResponse
+#from sse_starlette.sse import EventSourceResponse
 from starlette.status import HTTP_303_SEE_OTHER
 
 from azure_connect import AzureConnector, TestAzureConnector
@@ -126,7 +126,8 @@ def display_event(request: Request,
                   repeat: int = Form(...)):
                   
 
-    if json_object := is_valid_json(log_text):
+    json_object = is_valid_json(log_text)
+    if json_object:
         repeat_logs(json_object, repeat)
         log_text = json.dumps(json_object, indent=4, sort_keys=True)
 
@@ -138,7 +139,7 @@ def display_event(request: Request,
         "log_text": log_text,
         "time": time
     }
-    return templates.TemplateResponse("results.html", context)
+    return templates.TemplateResponse("results_poll.html", context)
 
 @app.post("/send_event")
 def submit(request: Request, 

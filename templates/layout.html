@@ -5,9 +5,12 @@
         <!-- <script src="https://cdn.skypack.dev/pin/@hotwired/turbo@v7.0.0-rc.3-Ke3RjT96B5Lqzi8XKAG9/mode=imports/optimized/@hotwired/turbo.js" ></script> -->
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.9.3/css/bulma.min.css" integrity="sha512-IgmDkwzs96t4SrChW29No3NXBIBv8baW490zk5aXvhCD8vuZM3yUSkbyTBcXohkySecyzIrUwiF/qV0cuPcL3Q==" crossorigin="anonymous" referrerpolicy="no-referrer" />
         <link rel="stylesheet" href="/static/css/custom_styles.css"/>
+        <script src="/static/js/listen.js" defer></script>
         <script type="module">
             import { connectStreamSource } from "https://cdn.skypack.dev/pin/@hotwired/turbo@v7.0.0-rc.3-Ke3RjT96B5Lqzi8XKAG9/mode=imports/optimized/@hotwired/turbo.js"
         </script>
+        {% block page_script %}
+        {% endblock %}
     </head>
     <body>
         <nav class="navbar mb-6">
