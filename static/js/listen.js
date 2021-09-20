@@ -9,21 +9,21 @@ const makeEvents = (events, eventContainer) => {
     }
 }
 
-function sleep(seconds) {
-    return new Promise(_ => setTimeout(_, seconds * 1000));
-}
-
 const poll = async (eventContainer) => {
-    fetch("/poll/poll")
-        .then(response => response.json())
-        .then(data => data.events)
-        .then((events) => makeEvents(events, eventContainer));
+    let response = await fetch("/poll/poll");
+    let json = await response.json();
+
+    if (json.poll == "not started") {
+        await fetch("/poll/subscribe", {"method": "POST"});
+    }
+
+    let events = json.events;
+    makeEvents(events, eventContainer);
 }
 
-const poller = async (secondsDelay, eventContainer) => {
+const poller = async (eventContainer) => {
     let page = "/event";
     while (window.location.pathname == page) {
         await poll(eventContainer);
-        await sleep(secondsDelay);
     }
 }

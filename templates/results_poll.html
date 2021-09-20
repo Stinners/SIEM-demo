@@ -2,14 +2,9 @@
 
 {% block page_script %}
 <script>
-    console.log("Script running");
     document.addEventListener("turbo:load" , () => {
-        // This might setup a race condition, if the first poll response 
-        // arrives before the listen
-        console.log("Listener Starting");
-        fetch("/poll/listen", {method: "POST"});
-        eventContainer = document.getElementById("message-container");
-        poller(2, eventContainer);
+        let eventContainer = document.getElementById("message-container");
+        poller(eventContainer);
     });
 </script>
 {% endblock %}

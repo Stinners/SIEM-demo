@@ -7,12 +7,10 @@ from typing import Optional, Any
 import asyncio
 
 from fastapi import FastAPI, Request, Form 
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm, oauth2
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import dotenv
-#from sse_starlette.sse import EventSourceResponse
 from starlette.status import HTTP_303_SEE_OTHER
 
 from azure_connect import AzureConnector, TestAzureConnector
@@ -147,36 +145,39 @@ def submit(request: Request,
            active_log: str = Form(...)):
     return RedirectResponse("/event")
 
-@app.get("/sse/listen")
-async def sse_endpoint(request: Request):
-    return EventSourceResponse(azure.start_eh_listener(request))
-
-@app.post("/poll/listen")
+@app.post("/poll/subscribe")
 async def listen():
-    # Check if the queue exists and create it if not 
     try: 
         app.queue 
     except AttributeError:
         app.queue = asyncio.Queue()
-        await azure.eh_listener(app.queue)
+        asyncio.create_task(azure.eh_listener(app.queue))
     return {"listen": "started"}
 
-def read_all(queue):
-    results = []
-    while True:
+async def get_events(queue, num_retries):
+    events = []
+    retries = 0 
+    while retries < num_retries:
         try:
-            results.append(queue.get_nowait())
+            next_event = queue.get_nowait()
+            events.append(next_event)
         except asyncio.QueueEmpty:
-            break 
-    return results
+            if events:
+                break
+            else:
+                await asyncio.sleep(2)
+                retries += 1 
+    return events
+
 
 @app.get("/poll/poll")
 async def poll():
     try:
         app.queue
-    except NameError:
+    except AttributeError:
         return {"poll": "not started"}
-    
-    events = read_all(app.queue)
+
+    events = await get_events(app.queue, num_retries=5)
+
     events = [azure.render_message(text, time) for (text, time) in events]
     return {"poll": "polling", "events": events}

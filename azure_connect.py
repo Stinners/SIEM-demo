@@ -66,12 +66,6 @@ class AbstractAzureConnector(ABC):
             text, time = await queue.get()
             response = template.render(message_content=text, time=time)
             yield response
-    
-    def start_eh_listener(self, request):
-        queue = asyncio.Queue()
-        listener = asyncio.create_task(self.eh_listener(queue))
-        return self.eh_responder(request, queue, listener)
-
 
 class TestAzureConnector(AbstractAzureConnector):
     """ Class for testing the frontend without touching azure"""
@@ -83,7 +77,6 @@ class TestAzureConnector(AbstractAzureConnector):
             time = current_time(DATE_DISPLAY_STRING)
             await queue.put((f"Test Event {i}", time))
             await asyncio.sleep(2)
-
 
 class AzureConnector(AbstractAzureConnector):
     def __init__(self) -> None:
